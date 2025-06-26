@@ -1,0 +1,127 @@
+public class GrabPayRefundHandler {
+    
+    // Main method to process refund through GrabPay
+    public static void processRefund() {
+        HttpRequest request = createRefundRequest();
+        HttpResponse response = sendRequest(request);
+        handleResponse(response);
+    }
+    
+    // Create HTTP request for GrabPay refund
+    private static HttpRequest createRefundRequest() {
+        HttpRequest request = new HttpRequest();
+        
+        // Prepare request body
+        Map<String, Object> jsonMap = new Map<String, Object>();
+        Integer amountInCents = Integer.valueOf(your amount * 100);
+       
+        
+        jsonMap.put('partnerGroupTxID', 'Any id to make group');
+        jsonMap.put('partnerTxID', 'Unique Id for each req');
+        jsonMap.put('amount', amountInCents); 
+        jsonMap.put('currency', refund.CurrencyIsoCode);
+        jsonMap.put('originTxID', 'Original transection id');
+        jsonMap.put('accessToken', 'Acesss token');
+        
+        String jsonString = Json.serialize(jsonMap);
+        System.debug('Initial Request JSON: ' + jsonString);
+        
+        // Modify the map for final request
+        Map<String, Object> deserializeMap = (Map<String, Object>)JSON.deserializeUntyped(jsonString);
+        
+        String merchantId = 'your marchent id';
+        String accessToken = 'accessToken';
+        deserializeMap.put('merchantID', merchantId);
+        String jsonStringBody = JSON.serialize(deserializeMap);
+        System.debug('Final Request Body: ' + jsonStringBody);
+        
+        // Set request properties
+        request.setMethod('POST');
+        request.setEndpoint('End point'); //https://partner-api.grab.com/grabpay/partner/v2/refund
+        request.setHeader('Content-Type', 'application/json');
+        request.setHeader('Authorization', 'Bearer ' + accessToken);
+        request.setHeader('X-GID-AUX-POP', getPopSignature('Your accessToken', 'your Client_Secret__c');
+        request.setHeader('Date', Datetime.now().formatGMT('EEE, dd MMM yyyy HH:mm:ss z'));
+        request.setBody(jsonStringBody);
+        
+        return request;
+    }
+    
+    // Generate POP signature for authentication
+    private static String getPopSignature(String accessToken, String clientSecret) {
+        Long timestampUnix = Datetime.now().getTime() / 1000;
+        
+        // For debugging - show formatted date
+        String formattedDateTime = Datetime.now().formatGmt('EEE, dd MMM yyyy HH:mm:ss z');
+        System.debug('Formatted Date Time: ' + formattedDateTime);
+        System.debug('Unix Timestamp: ' + timestampUnix);
+        
+        // Create message string using Unix timestamp
+        String message = String.valueOf(timestampUnix) + accessToken;
+        
+        // Generate HMAC SHA256 signature
+        Blob hmacData = Crypto.generateMac('hmacSHA256', 
+                                         Blob.valueOf(message), 
+                                         Blob.valueOf(clientSecret));
+        String signature = EncodingUtil.base64Encode(hmacData);
+        
+        // Prepare payload
+        Map<String, Object> payload = new Map<String, Object>{
+            'time_since_epoch' => timestampUnix,
+            'sig' => base64URLEncode(signature)
+        };
+        
+        // Convert payload to JSON and encode
+        String jsonPayload = JSON.serialize(payload);
+        String encodedPayload = base64URLEncode(EncodingUtil.base64Encode(Blob.valueOf(jsonPayload)));
+        System.debug('Pop Signature: ' + encodedPayload);
+        
+        return encodedPayload;
+    }
+    
+    // Helper method for Base64 URL encoding
+    private static String base64URLEncode(String base64) {
+        return base64.replace('+', '-')
+                   .replace('/', '_')
+                   .replace('=', '');
+    }
+    
+    // Send HTTP request
+    private static HttpResponse sendRequest(HttpRequest request) {
+        Http http = new Http();
+        HttpResponse response;
+        
+        try {
+            response = http.send(request);
+            System.debug('Response Status: ' + response.getStatus());
+            System.debug('Response Body: ' + response.getBody());
+        } catch (Exception e) {
+            System.debug('Error sending request: ' + e.getMessage());
+            throw new GrabPayException('Failed to process refund: ' + e.getMessage());
+        }
+        
+        return response;
+    }
+    
+    // Handle response from GrabPay
+    private static void handleResponse(HttpResponse response) {
+      Map<String, Object> responseMap = new Map<String, Object>();
+      responseMap = (Map<String, Object>)JSON.deserializeUntyped(response.getBody());
+        if (response.getStatusCode() == 200 || response.getStatusCode() == 201) {
+            if(responseMap.containsKey('txStatus')){          
+                String txStatus = String.valueOf(responseMap.get('txStatus')).toLowerCase();
+                if(txStatus == 'success') {
+                    System.debug('Refunded Secussfully');
+                }else{
+                    System.debug('Faild to refund');
+                }
+            }
+          
+        } 
+        else{
+          System.debug('Faild to refund');
+      }
+    }
+    
+   
+}
